@@ -20,6 +20,8 @@ QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 os.makedirs(LESSONS_DIR, exist_ok=True)
 os.makedirs(QUIZZES_DIR, exist_ok=True)
 
+init_database()
+
 jobs = {}
 jobs_lock = threading.Lock()
 
@@ -216,7 +218,6 @@ def reset_password(username):
 @app.route("/")
 @login_required
 def index():
-    init_database()
     user_id = session["user_id"]
     total_words, total_lessons, streak = get_stats(user_id)
     lessons = get_lessons(user_id)

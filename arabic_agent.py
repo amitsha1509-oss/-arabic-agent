@@ -19,8 +19,9 @@ LESSONS_DIR = os.path.join(BASE_DIR, "lessons")
 QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 
 def init_database():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
+    c.execute("PRAGMA journal_mode=WAL")
     c.execute("""
         CREATE TABLE IF NOT EXISTS words (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,7 +49,7 @@ def init_database():
     conn.close()
 
 def get_used_words():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("SELECT arabic FROM words")
     words = [row[0] for row in c.fetchall()]
@@ -56,7 +57,7 @@ def get_used_words():
     return words
 
 def save_to_database(data, today):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("""
         INSERT INTO lessons (date, topic, article, article_translation)
@@ -252,7 +253,7 @@ def create_lesson_html(data, today_hebrew, filename):
     return filename
 
 def create_quiz_html(today_hebrew, filename, topic=None):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     if topic:
         c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE topic = ?", (topic,))

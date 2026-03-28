@@ -4,7 +4,6 @@ import datetime
 import os
 import sys
 
-sys.path.insert(0, 'C:\\arabic-agent')
 from arabic_agent import generate_arabic_content, create_lesson_html, create_quiz_html, init_database, save_to_database, get_used_words
 
 app = Flask(__name__)
@@ -19,7 +18,7 @@ os.makedirs(LESSONS_DIR, exist_ok=True)
 os.makedirs(QUIZZES_DIR, exist_ok=True)
 
 def get_stats():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM words")
     total_words = c.fetchone()[0]
@@ -39,7 +38,7 @@ def get_stats():
     return total_words, total_lessons, streak
 
 def get_lessons():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("SELECT id, date, topic FROM lessons ORDER BY date DESC")
     lessons = []
@@ -56,7 +55,7 @@ def get_lessons():
     return lessons
 
 def get_quiz_topics():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("SELECT DISTINCT topic FROM words ORDER BY topic")
     topics = [row[0] for row in c.fetchall()]
@@ -104,7 +103,7 @@ def lesson_view(filename):
 
 @app.route("/delete-lesson/<int:lesson_id>")
 def delete_lesson(lesson_id):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("SELECT date, topic FROM lessons WHERE id = ?", (lesson_id,))
     row = c.fetchone()

@@ -20,7 +20,10 @@ QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 os.makedirs(LESSONS_DIR, exist_ok=True)
 os.makedirs(QUIZZES_DIR, exist_ok=True)
 
-init_database()
+try:
+    init_database()
+except Exception as e:
+    print(f"Warning: init_database() failed at startup: {e}")
 
 jobs = {}
 jobs_lock = threading.Lock()

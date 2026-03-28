@@ -20,15 +20,12 @@ LESSONS_DIR = os.path.join(BASE_DIR, "lessons")
 QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 
 def get_db():
-    raw = os.getenv("DATABASE_URL", "NOT SET")
-    url = urllib.parse.urlparse(raw)
-    print(f"DB DEBUG: host={url.hostname} user={url.username} port={url.port}")
     return psycopg2.connect(
-        host=url.hostname,
-        port=url.port,
-        database=url.path[1:],
-        user=url.username,
-        password=urllib.parse.unquote(url.password),
+        host=os.getenv("DB_HOST"),
+        port=int(os.getenv("DB_PORT", "6543")),
+        database=os.getenv("DB_NAME", "postgres"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
         sslmode="require"
     )
 

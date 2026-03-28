@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>חידון ערבית שבועי — 28.03.2026</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f7f8fc; color: #2d3142; padding: 24px 16px; direction: rtl; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { background: white; border-radius: 18px; padding: 32px; text-align: center; margin-bottom: 28px; border: 1px solid #eaedf5; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .header h1 { font-size: 26px; color: #2d3142; font-weight: 700; margin-bottom: 6px; }
+        .header p { color: #9fa4b8; font-size: 14px; margin-top: 8px; }
+        .score-bar { background: white; border-radius: 14px; padding: 16px 24px; margin-bottom: 24px; border: 1px solid #eaedf5; display: flex; align-items: center; justify-content: space-between; }
+        .score-label { color: #4a5296; font-weight: 700; font-size: 15px; }
+        .score-value { font-size: 22px; font-weight: 700; color: #2d3142; }
+        .instructions { background: #eef1fb; border-radius: 12px; padding: 14px 20px; margin-bottom: 24px; color: #4a5296; font-size: 14px; text-align: center; }
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .flip-card { height: 160px; cursor: pointer; perspective: 1000px; }
+        .flip-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
+        .flip-card.flipped .flip-inner { transform: rotateY(180deg); }
+        .flip-front, .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; border: 1px solid #eaedf5; }
+        .flip-front { background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .flip-back { background: #4a5296; color: white; transform: rotateY(180deg); }
+        .card-number { font-size: 11px; color: #c0c4d6; margin-bottom: 8px; }
+        .card-arabic { font-family: 'Traditional Arabic', 'Arial Unicode MS', Arial, sans-serif; font-size: 28px; color: #2d3142; direction: rtl; }
+        .card-hint { font-size: 11px; color: #c0c4d6; margin-top: 10px; }
+        .card-translation { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+        .card-transliteration { font-size: 13px; opacity: 0.85; margin-bottom: 4px; }
+        .card-root { font-size: 12px; opacity: 0.7; }
+        .reset-btn { display: block; margin: 0 auto; background: #4a5296; color: white; border: none; padding: 12px 32px; border-radius: 12px; font-size: 15px; cursor: pointer; font-family: inherit; }
+        .reset-btn:hover { background: #3a4286; }
+        .footer { text-align: center; color: #c0c4d6; font-size: 12px; margin-top: 20px; padding: 16px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🧠 חידון ערבית שבועי</h1>
+        <p>28.03.2026 • 10 מילים מהשבוע האחרון</p>
+    </div>
+    <div class="instructions">לחץ על כל כרטיס כדי לגלות את התרגום</div>
+    <div class="cards-grid">
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">1</div>
+                    <div class="card-arabic">غَابَة</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">יַעַר</div>
+                    <div class="card-transliteration">ע'אבה</div>
+                    <div class="card-root">غ.ي.ب — להיעלם, מקום סמוי</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">2</div>
+                    <div class="card-arabic">هَادِئ</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">שָׁקֵט, רָגוּעַ</div>
+                    <div class="card-transliteration">האדִּא</div>
+                    <div class="card-root">ه.د.أ — לשקוט, להירגע</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">3</div>
+                    <div class="card-arabic">حَيَوَان</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">חַיָּה, בַּעַל חַיִּים</div>
+                    <div class="card-transliteration">חַיַוַאן</div>
+                    <div class="card-root">ح.ي.و — חיים, להיות חי</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">4</div>
+                    <div class="card-arabic">تَنْمُو</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">גָּדֵל, מִתְפַּתֵּחַ</div>
+                    <div class="card-transliteration">תַנְמוּ</div>
+                    <div class="card-root">ن.م.و — לגדול, להתפתח</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">5</div>
+                    <div class="card-arabic">أَشْجَار</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">עֵצִים</div>
+                    <div class="card-transliteration">אַשְׂגַ'אר</div>
+                    <div class="card-root">ش.ج.ر — עץ, צמחייה</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">6</div>
+                    <div class="card-arabic">رَبِيع</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">אָבִיב</div>
+                    <div class="card-transliteration">רַבִּיע</div>
+                    <div class="card-root">ر.ب.ع — רבע, עונה רביעית</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">7</div>
+                    <div class="card-arabic">زَائِر</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">מְבַקֵּר, אוֹרֵחַ</div>
+                    <div class="card-transliteration">זַאאִר</div>
+                    <div class="card-root">ز.و.ر — לבקר, לבוא לראות</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">8</div>
+                    <div class="card-arabic">طُيُور</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">צִפּוֹרִים</div>
+                    <div class="card-transliteration">טֻיוּר</div>
+                    <div class="card-root">ط.ي.ر — לעוף, טיסה</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">9</div>
+                    <div class="card-arabic">نَقِيّ</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">צָלוּל, נָקִי</div>
+                    <div class="card-transliteration">נַקִּי</div>
+                    <div class="card-root">ن.ق.و — לנקות, טוהר</div>
+                </div>
+            </div>
+        </div>
+        <div class="flip-card" onclick="this.classList.toggle('flipped')">
+            <div class="flip-inner">
+                <div class="flip-front">
+                    <div class="card-number">10</div>
+                    <div class="card-arabic">حِمَايَة</div>
+                    <div class="card-hint">לחץ לגלות</div>
+                </div>
+                <div class="flip-back">
+                    <div class="card-translation">הֲגָנָה, שְׁמִירָה</div>
+                    <div class="card-transliteration">חִמַאיַה</div>
+                    <div class="card-root">ح.م.י — להגן, שמירה</div>
+                </div>
+            </div>
+        </div></div>
+    <button class="reset-btn" onclick="document.querySelectorAll('.flip-card').forEach(c=>c.classList.remove('flipped'))">🔄 התחל מחדש</button>
+    <div class="footer">חידון שבועי — סוכן הערבית שלך • 28.03.2026</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ערבית חבצלות</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #FAFAFA; color: #2D3748; min-height: 100vh; direction: rtl; }
+
+        /* ── Navbar ── */
+        .navbar { background: white; border-bottom: 2px solid #F0F0F0; padding: 0 32px; height: 64px; display: flex; align-items: center; position: sticky; top: 0; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+        .nav-inner { max-width: 960px; margin: 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; }
+        .nav-brand { font-size: 20px; font-weight: 800; color: #58CC02; text-decoration: none; letter-spacing: -0.3px; }
+        .nav-links { display: flex; align-items: center; gap: 10px; }
+        .nav-link { font-size: 14px; color: #4A5568; text-decoration: none; padding: 8px 16px; border-radius: 12px; font-weight: 600; transition: all 0.2s; }
+        .nav-link:hover { background: #F7F7F7; color: #2D3748; }
+        .nav-primary { background: #58CC02; color: white !important; }
+        .nav-primary:hover { background: #46A302 !important; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(88,204,2,0.3); }
+        .nav-secondary { background: #FFF3E0; color: #FF9600 !important; }
+        .nav-secondary:hover { background: #FFE0B2 !important; transform: translateY(-1px); }
+
+        /* ── Loading overlay ── */
+        .loading-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(250,250,250,0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+        .loading-overlay.active { display: flex; }
+        .spinner { width: 60px; height: 60px; border: 5px solid #E8F5E9; border-top-color: #58CC02; border-radius: 50%; animation: spin 0.85s linear infinite; margin-bottom: 24px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { font-size: 18px; color: #2D3748; font-weight: 700; margin-bottom: 8px; }
+        .loading-sub { font-size: 14px; color: #A0AEC0; min-height: 20px; }
+
+        /* ── Flash messages ── */
+        .flash { padding: 14px 20px; border-radius: 14px; margin-bottom: 20px; font-size: 14px; font-weight: 600; }
+        .flash.error { background: #FFF5F5; color: #C53030; border: 2px solid #FEB2B2; }
+        .flash.success { background: #F0FFF4; color: #276749; border: 2px solid #9AE6B4; }
+
+        /* ── Hero ── */
+        .hero { text-align: center; padding: 48px 16px 36px; }
+        .hero h1 { font-size: 46px; font-weight: 800; color: #2D3748; margin-bottom: 10px; letter-spacing: -1px; }
+        .hero .subtitle { font-size: 18px; color: #718096; font-weight: 500; }
+
+        /* ── Container ── */
+        .container { max-width: 960px; margin: 0 auto; padding: 0 20px 48px; }
+
+        /* ── Stats ── */
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 36px; }
+        .stat-card { background: white; border-radius: 22px; padding: 28px 20px; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.07); border: 3px solid transparent; transition: transform 0.2s, box-shadow 0.2s; cursor: default; }
+        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.11); }
+        .stat-card.streak { border-color: #FF9600; }
+        .stat-card.lessons { border-color: #58CC02; }
+        .stat-card.words { border-color: #7C3AED; }
+        .stat-number { font-size: 52px; font-weight: 800; margin-bottom: 6px; line-height: 1; }
+        .stat-number.orange { color: #FF9600; }
+        .stat-number.green { color: #58CC02; }
+        .stat-number.purple { color: #7C3AED; }
+        .stat-label { font-size: 13px; color: #A0AEC0; font-weight: 600; letter-spacing: 0.3px; }
+
+        /* ── Action cards ── */
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px; }
+        .action-card { border-radius: 26px; padding: 38px 28px; text-align: center; cursor: pointer; transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); text-decoration: none; display: block; box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
+        .action-card:hover { transform: translateY(-6px); }
+        .action-card .icon { font-size: 58px; margin-bottom: 18px; display: block; }
+        .action-card h2 { font-size: 22px; font-weight: 800; margin-bottom: 10px; }
+        .action-card p { font-size: 14px; line-height: 1.6; opacity: 0.9; }
+        .action-card.primary { background: linear-gradient(145deg, #58CC02, #3EA801); color: white; box-shadow: 0 8px 28px rgba(88,204,2,0.35); }
+        .action-card.primary:hover { box-shadow: 0 16px 40px rgba(88,204,2,0.45); }
+        .action-card.secondary { background: linear-gradient(145deg, #FF9600, #E07800); color: white; box-shadow: 0 8px 28px rgba(255,150,0,0.35); }
+        .action-card.secondary:hover { box-shadow: 0 16px 40px rgba(255,150,0,0.45); }
+
+        /* ── Section title ── */
+        .section-title { font-size: 18px; font-weight: 800; color: #2D3748; margin-bottom: 14px; margin-top: 36px; display: flex; align-items: center; gap: 8px; }
+
+        /* ── History list ── */
+        .history-list { display: flex; flex-direction: column; gap: 10px; }
+        .history-item { background: white; border-radius: 16px; padding: 16px 20px; border: 2px solid #F0F0F0; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: all 0.18s; }
+        .history-item:hover { border-color: #D9F0FF; transform: translateX(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .topic-badge { display: inline-block; background: #EDE9FE; color: #7C3AED; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+        .history-item .meta { font-size: 12px; color: #A0AEC0; margin-top: 3px; }
+        .btn-group { display: flex; gap: 8px; flex-shrink: 0; }
+        .btn { background: #F0FDF4; color: #58CC02; padding: 7px 16px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; transition: all 0.18s; border: 2px solid #BBF7D0; }
+        .btn:hover { background: #58CC02; color: white; border-color: #58CC02; }
+        .btn-danger { background: #FFF5F5; color: #E53E3E; border: 2px solid #FED7D7; }
+        .btn-danger:hover { background: #E53E3E; color: white; border-color: #E53E3E; }
+
+        /* ── Topic quiz section ── */
+        .topic-item { background: white; border-radius: 16px; padding: 14px 20px; border: 2px solid #F0F0F0; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 10px rgba(0,0,0,0.05); transition: all 0.18s; }
+        .topic-item:hover { border-color: #FED7AA; transform: translateX(-2px); }
+        .topic-name { font-weight: 700; color: #2D3748; font-size: 15px; }
+        .btn-quiz { background: #FFF3E0; color: #FF9600; padding: 7px 16px; border-radius: 10px; font-size: 13px; font-weight: 700; text-decoration: none; transition: all 0.18s; border: 2px solid #FED7AA; }
+        .btn-quiz:hover { background: #FF9600; color: white; border-color: #FF9600; }
+    </style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">קלוד חושב...</div>
+    <div class="loading-sub" id="loadingSub"></div>
+</div>
+
+<nav class="navbar">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand">🌸 ערבית חבצלות</a>
+        <div class="nav-links">
+            <a href="/" class="nav-link">דף הבית</a>
+            <a href="#" class="nav-link nav-primary" onclick="goTo('/generate-lesson', 'קלוד כותב את הכתבה...')">שיעור חדש</a>
+            <a href="#" class="nav-link nav-secondary" onclick="goTo('/generate-quiz', 'בונה את החידון...')">חידון</a>
+        </div>
+    </div>
+</nav>
+
+<div class="hero">
+    <h1>🌸 ערבית חבצלות</h1>
+    <div class="subtitle">בואו ללמוד ערבית — צעד אחד בכל יום ✨</div>
+</div>
+
+<div class="container">
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    <div class="stats">
+        <div class="stat-card streak">
+            <div class="stat-number orange">{{ streak }}🔥</div>
+            <div class="stat-label">ימים ברצף</div>
+        </div>
+        <div class="stat-card lessons">
+            <div class="stat-number green">{{ total_lessons }}</div>
+            <div class="stat-label">שיעורים שהושלמו</div>
+        </div>
+        <div class="stat-card words">
+            <div class="stat-number purple">{{ total_words }}</div>
+            <div class="stat-label">מילים שנלמדו</div>
+        </div>
+    </div>
+
+    <div class="actions">
+        <a href="#" class="action-card primary" onclick="goTo('/generate-lesson', 'קלוד כותב את הכתבה...')">
+            <span class="icon">📰</span>
+            <h2>שיעור יומי</h2>
+            <p>כתבה חדשה בערבית + 10 מילות מפתח</p>
+        </a>
+        <a href="#" class="action-card secondary" onclick="goTo('/generate-quiz', 'בונה את החידון...')">
+            <span class="icon">🧠</span>
+            <h2>חידון כולל</h2>
+            <p>כל המילים שלמדת, מחולקות לפי נושא</p>
+        </a>
+    </div>
+
+    {% if lessons %}
+    <div class="section-title">📚 שיעורים אחרונים</div>
+    <div class="history-list">
+        {% for lesson in lessons %}
+        <div class="history-item">
+            <div>
+                <div class="topic-badge">{{ lesson.topic }}</div>
+                <div class="meta">{{ lesson.date }} • 10 מילים</div>
+            </div>
+            <div class="btn-group">
+                <a href="/lesson/{{ lesson.filename }}" class="btn">פתח →</a>
+                <a href="/delete-lesson/{{ lesson.id }}" class="btn btn-danger" onclick="return confirm('למחוק את השיעור?')">🗑</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if topics %}
+    <div class="section-title">🎯 חידון לפי נושא</div>
+    <div class="history-list">
+        {% for topic in topics %}
+        <div class="topic-item">
+            <div class="topic-name">{{ topic }}</div>
+            <a href="#" class="btn-quiz" onclick="goTo('/generate-quiz/{{ topic }}', 'בונה חידון לנושא...')">חידון →</a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+    var loadingMessages = [
+        'קלוד בוחר נושא...',
+        'כותב את הכתבה בערבית...',
+        'בוחר את מילות המפתח...',
+        'מכין את העיצוב...'
+    ];
+    var loadingInterval = null;
+
+    function goTo(url, text) {
+        document.getElementById('loadingText').textContent = text;
+        var msgIndex = 0;
+        document.getElementById('loadingSub').textContent = loadingMessages[0];
+        loadingInterval = setInterval(function() {
+            msgIndex = (msgIndex + 1) % loadingMessages.length;
+            document.getElementById('loadingSub').textContent = loadingMessages[msgIndex];
+        }, 4000);
+        document.getElementById('loadingOverlay').classList.add('active');
+        window.location.href = url;
+    }
+
+    window.addEventListener('pageshow', function() {
+        document.getElementById('loadingOverlay').classList.remove('active');
+        if (loadingInterval) { clearInterval(loadingInterval); loadingInterval = null; }
+    });
+</script>
+
+</body>
+</html>

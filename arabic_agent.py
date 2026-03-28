@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 import json
 import datetime
 import re
-import sqlite3
+import psycopg2
+import psycopg2.extras
 from collections import defaultdict
 
 load_dotenv()
@@ -14,17 +15,18 @@ client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 twilio_client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "arabic_words.db")
 LESSONS_DIR = os.path.join(BASE_DIR, "lessons")
 QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 
+def get_db():
+    return psycopg2.connect(os.getenv("DATABASE_URL"), sslmode="require")
+
 def init_database():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("PRAGMA journal_mode=WAL")
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             security_question TEXT NOT NULL,
@@ -34,8 +36,8 @@ def init_database():
     """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS words (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
             date TEXT,
             arabic TEXT,
             translation TEXT,
@@ -44,43 +46,41 @@ def init_database():
             root TEXT,
             sentence TEXT,
             sentence_translation TEXT,
-            topic TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            topic TEXT
         )
     """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS lessons (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
             date TEXT,
             topic TEXT,
             article TEXT,
-            article_translation TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            article_translation TEXT
         )
     """)
     conn.commit()
     conn.close()
 
 def get_used_words(user_id):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT arabic FROM words WHERE user_id = ?", (user_id,))
+    c.execute("SELECT arabic FROM words WHERE user_id = %s", (user_id,))
     words = [row[0] for row in c.fetchall()]
     conn.close()
     return words
 
 def save_to_database(data, today, user_id):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
     c.execute("""
         INSERT INTO lessons (user_id, date, topic, article, article_translation)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s)
     """, (user_id, today, data["topic_hebrew"], data["article"], data["article_translation"]))
     for word in data["words"]:
         c.execute("""
             INSERT INTO words (user_id, date, arabic, translation, transliteration, pronunciation, root, sentence, sentence_translation, topic)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             user_id,
             today,
@@ -268,12 +268,12 @@ def create_lesson_html(data, today_hebrew, filename):
     return filename
 
 def create_quiz_html(today_hebrew, filename, topic=None, user_id=None):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
     if topic:
-        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE user_id = ? AND topic = ?", (user_id, topic))
+        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE user_id = %s AND topic = %s", (user_id, topic))
     else:
-        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE user_id = ?", (user_id,))
+        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE user_id = %s", (user_id,))
     words = c.fetchall()
     conn.close()
 

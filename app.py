@@ -1,19 +1,19 @@
 from flask import Flask, render_template, redirect, url_for, flash, send_file, abort, jsonify, session, request
 from werkzeug.security import generate_password_hash, check_password_hash
-import sqlite3
+import psycopg2
+import psycopg2.extras
 import datetime
 import os
 import threading
 import uuid
 from functools import wraps
 
-from arabic_agent import generate_arabic_content, create_lesson_html, create_quiz_html, init_database, save_to_database, get_used_words
+from arabic_agent import generate_arabic_content, create_lesson_html, create_quiz_html, init_database, save_to_database, get_used_words, get_db
 
 app = Flask(__name__)
 app.secret_key = "arabic-agent-secret-2024"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "arabic_words.db")
 LESSONS_DIR = os.path.join(BASE_DIR, "lessons")
 QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 
@@ -43,13 +43,13 @@ def login_required(f):
     return decorated
 
 def get_stats(user_id):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM words WHERE user_id = ?", (user_id,))
+    c.execute("SELECT COUNT(*) FROM words WHERE user_id = %s", (user_id,))
     total_words = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = ?", (user_id,))
+    c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = %s", (user_id,))
     total_lessons = c.fetchone()[0]
-    c.execute("SELECT date FROM lessons WHERE user_id = ? ORDER BY date DESC", (user_id,))
+    c.execute("SELECT date FROM lessons WHERE user_id = %s ORDER BY date DESC", (user_id,))
     dates = [row[0] for row in c.fetchall()]
     conn.close()
     streak = 0
@@ -63,9 +63,9 @@ def get_stats(user_id):
     return total_words, total_lessons, streak
 
 def get_lessons(user_id):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT id, date, topic FROM lessons WHERE user_id = ? ORDER BY date DESC", (user_id,))
+    c.execute("SELECT id, date, topic FROM lessons WHERE user_id = %s ORDER BY date DESC", (user_id,))
     lessons = []
     for row in c.fetchall():
         lesson_id, date, topic = row
@@ -80,9 +80,9 @@ def get_lessons(user_id):
     return lessons
 
 def get_quiz_topics(user_id):
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT DISTINCT topic FROM words WHERE user_id = ? ORDER BY topic", (user_id,))
+    c.execute("SELECT DISTINCT topic FROM words WHERE user_id = %s ORDER BY topic", (user_id,))
     topics = [row[0] for row in c.fetchall()]
     conn.close()
     return topics
@@ -121,16 +121,16 @@ def signup():
         if len(password) < 6:
             flash("הסיסמה חייבת להכיל לפחות 6 תווים.", "error")
             return render_template("signup.html", questions=SECURITY_QUESTIONS)
-        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT id FROM users WHERE username = ?", (username,))
+        c.execute("SELECT id FROM users WHERE username = %s", (username,))
         if c.fetchone():
             conn.close()
             flash("שם המשתמש כבר תפוס.", "error")
             return render_template("signup.html", questions=SECURITY_QUESTIONS)
         c.execute("""
             INSERT INTO users (username, password_hash, security_question, security_answer_hash, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s)
         """, (
             username,
             generate_password_hash(password),
@@ -139,7 +139,8 @@ def signup():
             datetime.date.today().strftime("%Y-%m-%d")
         ))
         conn.commit()
-        user_id = c.lastrowid
+        c.execute("SELECT id FROM users WHERE username = %s", (username,))
+        user_id = c.fetchone()[0]
         conn.close()
         session["user_id"] = user_id
         session["username"] = username
@@ -154,9 +155,9 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+        c.execute("SELECT id, password_hash FROM users WHERE username = %s", (username,))
         row = c.fetchone()
         conn.close()
         if not row or not check_password_hash(row[1], password):
@@ -176,9 +177,9 @@ def logout():
 def forgot_password():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        conn = sqlite3.connect(DB_PATH, timeout=30)
+        conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT id, security_question FROM users WHERE username = ?", (username,))
+        c.execute("SELECT id, security_question FROM users WHERE username = %s", (username,))
         row = c.fetchone()
         conn.close()
         if not row:
@@ -192,9 +193,9 @@ def forgot_password():
 def reset_password(username):
     answer = request.form.get("answer", "").strip().lower()
     new_password = request.form.get("new_password", "").strip()
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT id, security_question, security_answer_hash FROM users WHERE username = ?", (username,))
+    c.execute("SELECT id, security_question, security_answer_hash FROM users WHERE username = %s", (username,))
     row = c.fetchone()
     if not row or not check_password_hash(row[2], answer):
         conn.close()
@@ -206,7 +207,7 @@ def reset_password(username):
         flash("הסיסמה חייבת להכיל לפחות 6 תווים.", "error")
         return render_template("forgot_password.html", step="answer",
                                username=username, question=row[1])
-    c.execute("UPDATE users SET password_hash = ? WHERE username = ?",
+    c.execute("UPDATE users SET password_hash = %s WHERE username = %s",
               (generate_password_hash(new_password), username))
     conn.commit()
     conn.close()
@@ -273,14 +274,14 @@ def lesson_view(filename):
 @login_required
 def delete_lesson(lesson_id):
     user_id = session["user_id"]
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT date, topic FROM lessons WHERE id = ? AND user_id = ?", (lesson_id, user_id))
+    c.execute("SELECT date, topic FROM lessons WHERE id = %s AND user_id = %s", (lesson_id, user_id))
     row = c.fetchone()
     if row:
         date, topic = row
-        c.execute("DELETE FROM words WHERE date = ? AND topic = ? AND user_id = ?", (date, topic, user_id))
-        c.execute("DELETE FROM lessons WHERE id = ? AND user_id = ?", (lesson_id, user_id))
+        c.execute("DELETE FROM words WHERE date = %s AND topic = %s AND user_id = %s", (date, topic, user_id))
+        c.execute("DELETE FROM lessons WHERE id = %s AND user_id = %s", (lesson_id, user_id))
         conn.commit()
         if os.path.exists(LESSONS_DIR):
             for f in os.listdir(LESSONS_DIR):

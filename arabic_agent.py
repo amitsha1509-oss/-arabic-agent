@@ -23,8 +23,19 @@ def init_database():
     c = conn.cursor()
     c.execute("PRAGMA journal_mode=WAL")
     c.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            security_question TEXT NOT NULL,
+            security_answer_hash TEXT NOT NULL,
+            created_at TEXT
+        )
+    """)
+    c.execute("""
         CREATE TABLE IF NOT EXISTS words (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             date TEXT,
             arabic TEXT,
             translation TEXT,
@@ -33,41 +44,45 @@ def init_database():
             root TEXT,
             sentence TEXT,
             sentence_translation TEXT,
-            topic TEXT
+            topic TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS lessons (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
             date TEXT,
             topic TEXT,
             article TEXT,
-            article_translation TEXT
+            article_translation TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
     conn.commit()
     conn.close()
 
-def get_used_words():
+def get_used_words(user_id):
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
-    c.execute("SELECT arabic FROM words")
+    c.execute("SELECT arabic FROM words WHERE user_id = ?", (user_id,))
     words = [row[0] for row in c.fetchall()]
     conn.close()
     return words
 
-def save_to_database(data, today):
+def save_to_database(data, today, user_id):
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO lessons (date, topic, article, article_translation)
-        VALUES (?, ?, ?, ?)
-    """, (today, data["topic_hebrew"], data["article"], data["article_translation"]))
+        INSERT INTO lessons (user_id, date, topic, article, article_translation)
+        VALUES (?, ?, ?, ?, ?)
+    """, (user_id, today, data["topic_hebrew"], data["article"], data["article_translation"]))
     for word in data["words"]:
         c.execute("""
-            INSERT INTO words (date, arabic, translation, transliteration, pronunciation, root, sentence, sentence_translation, topic)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO words (user_id, date, arabic, translation, transliteration, pronunciation, root, sentence, sentence_translation, topic)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
+            user_id,
             today,
             word["arabic"],
             word["translation"],
@@ -252,13 +267,13 @@ def create_lesson_html(data, today_hebrew, filename):
         f.write(html)
     return filename
 
-def create_quiz_html(today_hebrew, filename, topic=None):
+def create_quiz_html(today_hebrew, filename, topic=None, user_id=None):
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
     if topic:
-        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE topic = ?", (topic,))
+        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE user_id = ? AND topic = ?", (user_id, topic))
     else:
-        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words")
+        c.execute("SELECT arabic, translation, transliteration, root, topic FROM words WHERE user_id = ?", (user_id,))
     words = c.fetchall()
     conn.close()
 

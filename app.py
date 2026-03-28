@@ -1,15 +1,16 @@
-from flask import Flask, render_template, redirect, url_for, flash, send_file, abort, jsonify
+from flask import Flask, render_template, redirect, url_for, flash, send_file, abort, jsonify, session, request
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import datetime
 import os
-import sys
 import threading
 import uuid
+from functools import wraps
 
 from arabic_agent import generate_arabic_content, create_lesson_html, create_quiz_html, init_database, save_to_database, get_used_words
 
 app = Flask(__name__)
-app.secret_key = "arabic-agent-secret"
+app.secret_key = "arabic-agent-secret-2024"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "arabic_words.db")
@@ -19,18 +20,34 @@ QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 os.makedirs(LESSONS_DIR, exist_ok=True)
 os.makedirs(QUIZZES_DIR, exist_ok=True)
 
-# In-memory job store: job_id -> {status, filename, topic, error}
 jobs = {}
 jobs_lock = threading.Lock()
 
-def get_stats():
+SECURITY_QUESTIONS = [
+    "מה שם החיה הראשונה שלך?",
+    "מה שם בית הספר היסודי שלך?",
+    "מה שם העיר שבה נולדת?",
+    "מה השם הפרטי של אמא שלך?",
+    "מה הייתה המכונית הראשונה שלך?",
+    "מה שם החבר הכי טוב שלך מהילדות?",
+]
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if "user_id" not in session:
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+def get_stats(user_id):
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM words")
+    c.execute("SELECT COUNT(*) FROM words WHERE user_id = ?", (user_id,))
     total_words = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM lessons")
+    c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = ?", (user_id,))
     total_lessons = c.fetchone()[0]
-    c.execute("SELECT date FROM lessons ORDER BY date DESC")
+    c.execute("SELECT date FROM lessons WHERE user_id = ? ORDER BY date DESC", (user_id,))
     dates = [row[0] for row in c.fetchall()]
     conn.close()
     streak = 0
@@ -43,55 +60,169 @@ def get_stats():
             break
     return total_words, total_lessons, streak
 
-def get_lessons():
+def get_lessons(user_id):
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
-    c.execute("SELECT id, date, topic FROM lessons ORDER BY date DESC")
+    c.execute("SELECT id, date, topic FROM lessons WHERE user_id = ? ORDER BY date DESC", (user_id,))
     lessons = []
     for row in c.fetchall():
         lesson_id, date, topic = row
         filename = None
         if os.path.exists(LESSONS_DIR):
             for f in os.listdir(LESSONS_DIR):
-                if f.startswith(f"lesson_{date}"):
+                if f.startswith(f"lesson_{user_id}_{date}"):
                     filename = f
                     break
         lessons.append({"id": lesson_id, "date": date, "topic": topic, "filename": filename or ""})
     conn.close()
     return lessons
 
-def get_quiz_topics():
+def get_quiz_topics(user_id):
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
-    c.execute("SELECT DISTINCT topic FROM words ORDER BY topic")
+    c.execute("SELECT DISTINCT topic FROM words WHERE user_id = ? ORDER BY topic", (user_id,))
     topics = [row[0] for row in c.fetchall()]
     conn.close()
     return topics
 
-def run_lesson_job(job_id):
+def run_lesson_job(job_id, user_id):
     try:
         today = datetime.date.today().strftime("%Y-%m-%d")
         today_hebrew = datetime.date.today().strftime("%d.%m.%Y")
-        used_words = get_used_words()
+        used_words = get_used_words(user_id)
         data = generate_arabic_content(used_words)
         timestamp = datetime.datetime.now().strftime("%H%M%S")
-        filename = f"lesson_{today}_{timestamp}.html"
+        filename = f"lesson_{user_id}_{today}_{timestamp}.html"
         filepath = os.path.join(LESSONS_DIR, filename)
         create_lesson_html(data, today_hebrew, filepath)
-        save_to_database(data, today)
+        save_to_database(data, today, user_id)
         with jobs_lock:
             jobs[job_id] = {"status": "done", "filename": filename, "topic": data["topic_hebrew"], "error": None}
     except Exception as e:
         with jobs_lock:
             jobs[job_id] = {"status": "error", "filename": None, "topic": None, "error": str(e)}
 
+# ── Auth routes ──
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        question = request.form.get("security_question", "").strip()
+        answer = request.form.get("security_answer", "").strip().lower()
+        if not username or not password or not question or not answer:
+            flash("יש למלא את כל השדות.", "error")
+            return render_template("signup.html", questions=SECURITY_QUESTIONS)
+        if len(password) < 6:
+            flash("הסיסמה חייבת להכיל לפחות 6 תווים.", "error")
+            return render_template("signup.html", questions=SECURITY_QUESTIONS)
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        c = conn.cursor()
+        c.execute("SELECT id FROM users WHERE username = ?", (username,))
+        if c.fetchone():
+            conn.close()
+            flash("שם המשתמש כבר תפוס.", "error")
+            return render_template("signup.html", questions=SECURITY_QUESTIONS)
+        c.execute("""
+            INSERT INTO users (username, password_hash, security_question, security_answer_hash, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (
+            username,
+            generate_password_hash(password),
+            question,
+            generate_password_hash(answer),
+            datetime.date.today().strftime("%Y-%m-%d")
+        ))
+        conn.commit()
+        user_id = c.lastrowid
+        conn.close()
+        session["user_id"] = user_id
+        session["username"] = username
+        flash(f"ברוך הבא, {username}!", "success")
+        return redirect(url_for("index"))
+    return render_template("signup.html", questions=SECURITY_QUESTIONS)
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if "user_id" in session:
+        return redirect(url_for("index"))
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        c = conn.cursor()
+        c.execute("SELECT id, password_hash FROM users WHERE username = ?", (username,))
+        row = c.fetchone()
+        conn.close()
+        if not row or not check_password_hash(row[1], password):
+            flash("שם משתמש או סיסמה שגויים.", "error")
+            return render_template("login.html")
+        session["user_id"] = row[0]
+        session["username"] = username
+        return redirect(url_for("index"))
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        conn = sqlite3.connect(DB_PATH, timeout=30)
+        c = conn.cursor()
+        c.execute("SELECT id, security_question FROM users WHERE username = ?", (username,))
+        row = c.fetchone()
+        conn.close()
+        if not row:
+            flash("שם המשתמש לא נמצא.", "error")
+            return render_template("forgot_password.html", step="username")
+        return render_template("forgot_password.html", step="answer",
+                               username=username, question=row[1])
+    return render_template("forgot_password.html", step="username")
+
+@app.route("/reset-password/<username>", methods=["POST"])
+def reset_password(username):
+    answer = request.form.get("answer", "").strip().lower()
+    new_password = request.form.get("new_password", "").strip()
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    c = conn.cursor()
+    c.execute("SELECT id, security_question, security_answer_hash FROM users WHERE username = ?", (username,))
+    row = c.fetchone()
+    if not row or not check_password_hash(row[2], answer):
+        conn.close()
+        flash("התשובה לשאלת האבטחה שגויה.", "error")
+        return render_template("forgot_password.html", step="answer",
+                               username=username, question=row[1] if row else "")
+    if len(new_password) < 6:
+        conn.close()
+        flash("הסיסמה חייבת להכיל לפחות 6 תווים.", "error")
+        return render_template("forgot_password.html", step="answer",
+                               username=username, question=row[1])
+    c.execute("UPDATE users SET password_hash = ? WHERE username = ?",
+              (generate_password_hash(new_password), username))
+    conn.commit()
+    conn.close()
+    flash("הסיסמה עודכנה! אפשר להתחבר.", "success")
+    return redirect(url_for("login"))
+
+# ── App routes ──
+
 @app.route("/")
+@login_required
 def index():
     init_database()
-    total_words, total_lessons, streak = get_stats()
-    lessons = get_lessons()
-    topics = get_quiz_topics()
+    user_id = session["user_id"]
+    total_words, total_lessons, streak = get_stats(user_id)
+    lessons = get_lessons(user_id)
+    topics = get_quiz_topics(user_id)
     return render_template("index.html",
+        username=session["username"],
         total_words=total_words,
         total_lessons=total_lessons,
         streak=streak,
@@ -100,15 +231,18 @@ def index():
     )
 
 @app.route("/generate-lesson")
+@login_required
 def generate_lesson():
+    user_id = session["user_id"]
     job_id = str(uuid.uuid4())
     with jobs_lock:
         jobs[job_id] = {"status": "pending", "filename": None, "topic": None, "error": None}
-    t = threading.Thread(target=run_lesson_job, args=(job_id,), daemon=True)
+    t = threading.Thread(target=run_lesson_job, args=(job_id, user_id), daemon=True)
     t.start()
     return redirect(url_for("loading", job_id=job_id))
 
 @app.route("/loading/<job_id>")
+@login_required
 def loading(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
@@ -118,6 +252,7 @@ def loading(job_id):
     return render_template("loading.html", job_id=job_id)
 
 @app.route("/job-status/<job_id>")
+@login_required
 def job_status(job_id):
     with jobs_lock:
         job = jobs.get(job_id)
@@ -126,6 +261,7 @@ def job_status(job_id):
     return jsonify(job)
 
 @app.route("/lesson/<filename>")
+@login_required
 def lesson_view(filename):
     filepath = os.path.join(LESSONS_DIR, filename)
     if not os.path.exists(filepath):
@@ -133,19 +269,21 @@ def lesson_view(filename):
     return send_file(filepath)
 
 @app.route("/delete-lesson/<int:lesson_id>")
+@login_required
 def delete_lesson(lesson_id):
+    user_id = session["user_id"]
     conn = sqlite3.connect(DB_PATH, timeout=30)
     c = conn.cursor()
-    c.execute("SELECT date, topic FROM lessons WHERE id = ?", (lesson_id,))
+    c.execute("SELECT date, topic FROM lessons WHERE id = ? AND user_id = ?", (lesson_id, user_id))
     row = c.fetchone()
     if row:
         date, topic = row
-        c.execute("DELETE FROM words WHERE date = ? AND topic = ?", (date, topic))
-        c.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+        c.execute("DELETE FROM words WHERE date = ? AND topic = ? AND user_id = ?", (date, topic, user_id))
+        c.execute("DELETE FROM lessons WHERE id = ? AND user_id = ?", (lesson_id, user_id))
         conn.commit()
         if os.path.exists(LESSONS_DIR):
             for f in os.listdir(LESSONS_DIR):
-                if f.startswith(f"lesson_{date}"):
+                if f.startswith(f"lesson_{user_id}_{date}"):
                     os.remove(os.path.join(LESSONS_DIR, f))
     conn.close()
     flash("השיעור נמחק.", "success")
@@ -153,14 +291,16 @@ def delete_lesson(lesson_id):
 
 @app.route("/generate-quiz")
 @app.route("/generate-quiz/<topic>")
+@login_required
 def generate_quiz(topic=None):
     try:
+        user_id = session["user_id"]
         today = datetime.date.today().strftime("%Y-%m-%d")
         today_hebrew = datetime.date.today().strftime("%d.%m.%Y")
         timestamp = datetime.datetime.now().strftime("%H%M%S")
-        filename = f"quiz_{today}_{timestamp}.html"
+        filename = f"quiz_{user_id}_{today}_{timestamp}.html"
         filepath = os.path.join(QUIZZES_DIR, filename)
-        result = create_quiz_html(today_hebrew, filepath, topic=topic)
+        result = create_quiz_html(today_hebrew, filepath, topic=topic, user_id=user_id)
         if result:
             return send_file(filepath)
         else:

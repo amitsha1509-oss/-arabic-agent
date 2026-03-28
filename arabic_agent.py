@@ -8,6 +8,7 @@ import re
 import psycopg2
 import psycopg2.extras
 from collections import defaultdict
+import urllib.parse
 
 load_dotenv()
 
@@ -19,7 +20,15 @@ LESSONS_DIR = os.path.join(BASE_DIR, "lessons")
 QUIZZES_DIR = os.path.join(BASE_DIR, "quizzes")
 
 def get_db():
-    return psycopg2.connect(os.getenv("DATABASE_URL"), sslmode="require")
+    url = urllib.parse.urlparse(os.getenv("DATABASE_URL"))
+    return psycopg2.connect(
+        host=url.hostname,
+        port=url.port,
+        database=url.path[1:],
+        user=url.username,
+        password=urllib.parse.unquote(url.password),
+        sslmode="require"
+    )
 
 def init_database():
     conn = get_db()

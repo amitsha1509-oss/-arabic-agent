@@ -110,7 +110,7 @@
     <div class="nav-inner">
         <a href="/" class="nav-brand">🌸 ערבית חבצלות</a>
         <div class="nav-links">
-            <a href="#" class="nav-link nav-primary" onclick="goTo('/generate-lesson', 'מכין שיעור...')">שיעור חדש</a>
+            <a href="#" class="nav-link nav-primary" onclick="document.getElementById('lessonTopic').focus();document.getElementById('lessonTopic').scrollIntoView({behavior:'smooth',block:'center'});return false;">שיעור חדש</a>
             <a href="#" class="nav-link nav-secondary" onclick="goTo('/generate-quiz', 'בונה את החידון...')">חידון</a>
             <span class="nav-user">👤 {{ username }}</span>
             <a href="/logout" class="nav-link nav-logout">יציאה</a>

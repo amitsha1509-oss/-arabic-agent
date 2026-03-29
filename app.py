@@ -235,10 +235,24 @@ def index():
         topics=topics
     )
 
+ADMIN_USERNAME = "amit shania"
+DAILY_LESSON_LIMIT = 3
+
 @app.route("/generate-lesson")
 @login_required
 def generate_lesson():
     user_id = session["user_id"]
+    username = session["username"]
+    if username != ADMIN_USERNAME:
+        today = datetime.date.today().strftime("%Y-%m-%d")
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM lessons WHERE user_id = %s AND date = %s", (user_id, today))
+        count = c.fetchone()[0]
+        conn.close()
+        if count >= DAILY_LESSON_LIMIT:
+            flash("הגעת למגבלה היומית של 3 שיעורים. חזור מחר!", "error")
+            return redirect(url_for("index"))
     job_id = str(uuid.uuid4())
     with jobs_lock:
         jobs[job_id] = {"status": "pending", "filename": None, "topic": None, "error": None}

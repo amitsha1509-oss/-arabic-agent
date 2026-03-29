@@ -82,6 +82,43 @@ def get_lessons(user_id):
     conn.close()
     return lessons
 
+def get_leaderboard():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT u.id, u.username,
+               COUNT(DISTINCT l.id) AS total_lessons,
+               COUNT(DISTINCT w.id) AS total_words
+        FROM users u
+        JOIN lessons l ON l.user_id = u.id
+        LEFT JOIN words w ON w.user_id = u.id
+        GROUP BY u.id, u.username
+        HAVING COUNT(DISTINCT l.id) >= 1
+    """)
+    users = c.fetchall()
+    c.execute("SELECT user_id, date FROM lessons ORDER BY user_id, date DESC")
+    all_dates = c.fetchall()
+    conn.close()
+    from collections import defaultdict
+    user_dates = defaultdict(list)
+    for uid, date in all_dates:
+        user_dates[uid].append(date)
+    today = datetime.date.today()
+    result = []
+    for uid, username, total_lessons, total_words in users:
+        dates = user_dates[uid]
+        streak = 0
+        for i in range(len(dates)):
+            expected = (today - datetime.timedelta(days=i)).strftime("%Y-%m-%d")
+            if i < len(dates) and dates[i] == expected:
+                streak += 1
+            else:
+                break
+        result.append({"username": username, "streak": streak,
+                       "total_words": total_words, "total_lessons": total_lessons})
+    result.sort(key=lambda x: (-x["streak"], -x["total_words"]))
+    return result
+
 def get_quiz_topics(user_id):
     conn = get_db()
     c = conn.cursor()
@@ -335,6 +372,12 @@ def generate_quiz(topic=None):
     except Exception as e:
         flash(f"שגיאה: {str(e)}", "error")
         return redirect(url_for("index"))
+
+@app.route("/leaderboard")
+@login_required
+def leaderboard():
+    data = get_leaderboard()
+    return render_template("leaderboard.html", rows=data, username=session["username"])
 
 if __name__ == "__main__":
     init_database()

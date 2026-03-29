@@ -323,6 +323,7 @@ def create_lesson_html(data, today_hebrew, filename):
             <a href="/" class="nav-link">דף הבית</a>
             <a href="/generate-lesson" class="nav-link nav-primary">שיעור חדש</a>
             <a href="/generate-quiz" class="nav-link nav-secondary">חידון</a>
+            <a href="/leaderboard" class="nav-link" style="background:#EDE9FE;color:#7C3AED;">לוח תוצאות</a>
         </div>
     </div>
 </nav>
@@ -453,6 +454,7 @@ def create_quiz_html(today_hebrew, filename, topic=None, user_id=None):
             <a href="/" class="nav-link">דף הבית</a>
             <a href="/generate-lesson" class="nav-link nav-primary">שיעור חדש</a>
             <a href="/generate-quiz" class="nav-link nav-secondary">חידון</a>
+            <a href="/leaderboard" class="nav-link" style="background:#EDE9FE;color:#7C3AED;">לוח תוצאות</a>
         </div>
     </div>
 </nav>

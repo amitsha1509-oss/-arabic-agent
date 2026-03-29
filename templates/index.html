@@ -208,12 +208,20 @@
     function startLesson() {
         var topic = document.getElementById('lessonTopic').value.trim();
         var words = document.getElementById('lessonWords').value.trim();
-        var url = '/generate-lesson';
-        var params = [];
-        if (topic) params.push('topic=' + encodeURIComponent(topic));
-        if (words) params.push('words=' + encodeURIComponent(words));
-        if (params.length) url += '?' + params.join('&');
-        goTo(url, 'מכין שיעור...');
+        document.getElementById('loadingText').textContent = 'מכין שיעור...';
+        document.getElementById('loadingSub').textContent = loadingMessages[0];
+        document.getElementById('loadingOverlay').classList.add('active');
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/generate-lesson';
+        var t = document.createElement('input');
+        t.type = 'hidden'; t.name = 'topic'; t.value = topic;
+        var w = document.createElement('input');
+        w.type = 'hidden'; w.name = 'words'; w.value = words;
+        form.appendChild(t);
+        form.appendChild(w);
+        document.body.appendChild(form);
+        form.submit();
     }
 
     function goTo(url, text) {

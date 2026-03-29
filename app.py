@@ -238,15 +238,18 @@ def index():
 ADMIN_USERNAME = "amit shania"
 DAILY_LESSON_LIMIT = 3
 
-@app.route("/generate-lesson")
+@app.route("/generate-lesson", methods=["GET", "POST"])
 @login_required
 def generate_lesson():
     user_id = session["user_id"]
     username = session["username"]
-    topic_raw = request.args.get("topic", "")
-    topic = topic_raw.strip() or None
-    custom_words = request.args.get("words", "").strip() or None
-    print(f"[generate_lesson] topic_raw={repr(topic_raw)} topic={repr(topic)}", flush=True)
+    if request.method == "POST":
+        topic = request.form.get("topic", "").strip() or None
+        custom_words = request.form.get("words", "").strip() or None
+    else:
+        topic = request.args.get("topic", "").strip() or None
+        custom_words = request.args.get("words", "").strip() or None
+    print(f"[generate_lesson] method={request.method} topic={repr(topic)}", flush=True)
     if username != ADMIN_USERNAME:
         today = datetime.date.today().strftime("%Y-%m-%d")
         conn = get_db()

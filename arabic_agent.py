@@ -104,6 +104,34 @@ def save_to_database(data, today, user_id):
     conn.commit()
     conn.close()
 
+ARABIC_CHARS = re.compile(r'[\u0600-\u06FF]')
+HEBREW_CHARS = re.compile(r'[\u05D0-\u05EA\u05F0-\u05F4\uFB1D-\uFB4E]')
+LATIN_CHARS  = re.compile(r'[A-Za-z]')
+
+def _has_arabic(s):  return bool(ARABIC_CHARS.search(s))
+def _has_hebrew(s):  return bool(HEBREW_CHARS.search(s))
+def _has_latin(s):   return bool(LATIN_CHARS.search(s))
+
+def validate_word(word, index):
+    errors = []
+    if _has_arabic(word.get('translation','')) or _has_latin(word.get('translation','')):
+        errors.append(f"word {index} 'translation' must be Hebrew only")
+    if _has_arabic(word.get('transliteration_hebrew','')) or _has_latin(word.get('transliteration_hebrew','')):
+        errors.append(f"word {index} 'transliteration_hebrew' must be Hebrew only")
+    if _has_arabic(word.get('pronunciation_hebrew','')) or _has_latin(word.get('pronunciation_hebrew','')):
+        errors.append(f"word {index} 'pronunciation_hebrew' must be Hebrew only")
+    if _has_latin(word.get('root','')):
+        errors.append(f"word {index} 'root' must not contain Latin characters")
+    if not _has_arabic(word.get('root','')) and not _has_hebrew(word.get('root','')):
+        errors.append(f"word {index} 'root' must contain Arabic root letters")
+    if _has_hebrew(word.get('sentence','')) or _has_latin(word.get('sentence','')):
+        errors.append(f"word {index} 'sentence' must be Arabic only")
+    if not _has_arabic(word.get('sentence','')):
+        errors.append(f"word {index} 'sentence' must contain Arabic text")
+    if _has_arabic(word.get('sentence_translation','')) or _has_latin(word.get('sentence_translation','')):
+        errors.append(f"word {index} 'sentence_translation' must be Hebrew only")
+    return errors
+
 def generate_arabic_content(used_words):
     print("Calling Claude...")
     used_sample = ", ".join(used_words[-50:]) if used_words else "none yet"
@@ -115,28 +143,39 @@ def generate_arabic_content(used_words):
 IMPORTANT: Return ONLY a valid JSON object. No markdown, no code fences, no explanation. Just the raw JSON.
 
 {{
-  "topic_hebrew": "נושא בעברית בלבד — חשוב מאוד: רק עברית, אין ערבית בשדה הזה",
-  "article": "כתבה קצרה של 6 משפטים בערבית ספרותית עם ניקוד מלא",
+  "topic_hebrew": "נושא בעברית בלבד",
+  "article": "כתבה של 6 משפטים בערבית ספרותית עם ניקוד מלא",
   "article_translation": "תרגום מלא של הכתבה לעברית, משפט אחר משפט",
   "words": [
     {{
-      "arabic": "מילה עם ניקוד ללא ניקוד סופי",
-      "transliteration_hebrew": "תעתיק בעברית בלבד",
-      "pronunciation_hebrew": "הסבר הגייה בעברית",
-      "root": "א.ב.ג — משמעות בעברית",
-      "sentence": "משפט קצר מהכתבה עם ניקוד",
-      "sentence_translation": "תרגום לעברית",
-      "translation": "תרגום המילה"
+      "arabic": "מילה בערבית עם ניקוד",
+      "translation": "תרגום עברי בלבד",
+      "transliteration_hebrew": "תעתיק בעברית בלבד — לדוגמה: פַּצַ'ל",
+      "pronunciation_hebrew": "הסבר הגייה בעברית — לדוגמה: פ' עם דגש, ל' בסוף",
+      "root": "ف.ص.ל — משמעות השורש בעברית",
+      "sentence": "משפט קצר בערבית מהכתבה עם ניקוד מלא",
+      "sentence_translation": "תרגום המשפט לעברית בלבד"
     }}
   ]
 }}
 
-STRICT RULES:
-- topic_hebrew: HEBREW ONLY — absolutely no Arabic characters allowed in this field
-- Exactly 10 words from the article
+STRICT LANGUAGE RULES — every field must contain ONLY its designated language. Mixed language is forbidden:
+- topic_hebrew: HEBREW ONLY — zero Arabic or English characters
+- article: ARABIC ONLY with full harakat — use ONLY Arabic punctuation: . ، ؟ ! — NO Western commas or question marks
+- article_translation: HEBREW ONLY with standard Hebrew/Western punctuation (. , ? !) — this is correct
+- translation: HEBREW ONLY — no Arabic, no English
+- transliteration_hebrew: HEBREW LETTERS ONLY — no English, no Arabic
+- pronunciation_hebrew: HEBREW ONLY explanation — no English, no Arabic
+- root: Arabic root letters with dots between them (e.g. ف.ص.ل) followed by — and Hebrew meaning — no English
+- sentence: ARABIC ONLY taken from the article with full harakat — no Hebrew, no English
+- sentence_translation: HEBREW ONLY — no Arabic, no English
+
+Before returning JSON, verify each field contains only its designated language.
+
+ADDITIONAL RULES:
+- Exactly 10 words
 - All Arabic must have full harakat
 - No final case endings on individual words
-- Transliteration and pronunciation in Hebrew only
 - Keep sentences SHORT (max 8 words each)
 - Keep the article SHORT (6 sentences only)
 - AVOID these words already used: {used_sample}
@@ -147,8 +186,15 @@ STRICT RULES:
     raw = re.sub(r'\n?```$', '', raw)
     raw = raw.strip()
     data = json.loads(raw)
-    # Extra safety: strip any Arabic chars from topic
     data['topic_hebrew'] = re.sub(r'[\u0600-\u06FF]+', '', data['topic_hebrew']).strip(' -–—')
+
+    # Server-side validation
+    all_errors = []
+    for i, word in enumerate(data.get('words', []), 1):
+        all_errors.extend(validate_word(word, i))
+    if all_errors:
+        raise ValueError("Language validation failed:\n" + "\n".join(all_errors))
+
     return data
 
 def create_lesson_html(data, today_hebrew, filename):

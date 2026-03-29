@@ -90,12 +90,12 @@ def get_quiz_topics(user_id):
     conn.close()
     return topics
 
-def run_lesson_job(job_id, user_id):
+def run_lesson_job(job_id, user_id, topic=None, custom_words=None):
     try:
         today = datetime.date.today().strftime("%Y-%m-%d")
         today_hebrew = datetime.date.today().strftime("%d.%m.%Y")
         used_words = get_used_words(user_id)
-        data = generate_arabic_content(used_words)
+        data = generate_arabic_content(used_words, topic=topic, custom_words=custom_words)
         timestamp = datetime.datetime.now().strftime("%H%M%S")
         filename = f"lesson_{user_id}_{today}_{timestamp}.html"
         filepath = os.path.join(LESSONS_DIR, filename)
@@ -243,6 +243,10 @@ DAILY_LESSON_LIMIT = 3
 def generate_lesson():
     user_id = session["user_id"]
     username = session["username"]
+    topic_raw = request.args.get("topic", "")
+    topic = topic_raw.strip() or None
+    custom_words = request.args.get("words", "").strip() or None
+    print(f"[generate_lesson] topic_raw={repr(topic_raw)} topic={repr(topic)}", flush=True)
     if username != ADMIN_USERNAME:
         today = datetime.date.today().strftime("%Y-%m-%d")
         conn = get_db()
@@ -256,7 +260,7 @@ def generate_lesson():
     job_id = str(uuid.uuid4())
     with jobs_lock:
         jobs[job_id] = {"status": "pending", "filename": None, "topic": None, "error": None}
-    t = threading.Thread(target=run_lesson_job, args=(job_id, user_id), daemon=True)
+    t = threading.Thread(target=run_lesson_job, args=(job_id, user_id), kwargs={"topic": topic, "custom_words": custom_words}, daemon=True)
     t.start()
     return redirect(url_for("loading", job_id=job_id))
 

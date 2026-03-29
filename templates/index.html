@@ -22,6 +22,12 @@
         .nav-user { font-size: 13px; color: #718096; font-weight: 600; padding: 0 4px; }
         .nav-logout { background: #FFF5F5; color: #C53030 !important; }
         .nav-logout:hover { background: #FED7D7 !important; }
+        .lesson-inputs { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 10px; }
+        .lesson-input { width: 100%; padding: 10px 14px; border: 2px solid rgba(255,255,255,0.4); border-radius: 12px; font-size: 13px; font-family: inherit; background: rgba(255,255,255,0.2); color: white; direction: rtl; }
+        .lesson-input::placeholder { color: rgba(255,255,255,0.7); }
+        .lesson-input:focus { outline: none; border-color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.25); }
+        .start-btn { width: 100%; padding: 11px; background: white; color: #46A302; border: none; border-radius: 12px; font-size: 14px; font-weight: 800; cursor: pointer; margin-top: 4px; transition: all 0.2s; }
+        .start-btn:hover { background: #F0FFF4; transform: translateY(-1px); }
 
         /* ── Loading overlay ── */
         .loading-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(250,250,250,0.95); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
@@ -141,11 +147,16 @@
     </div>
 
     <div class="actions">
-        <a href="#" class="action-card primary" onclick="goTo('/generate-lesson', 'קלוד כותב את הכתבה...')">
+        <div class="action-card primary">
             <span class="icon">📰</span>
             <h2>שיעור יומי</h2>
             <p>כתבה חדשה בערבית + 10 מילות מפתח</p>
-        </a>
+            <div class="lesson-inputs" onclick="event.stopPropagation()">
+                <input type="text" id="lessonTopic" placeholder="נושא — השאר ריק לנושא אקראי" class="lesson-input">
+                <input type="text" id="lessonWords" placeholder="מילים ספציפיות — לדוגמה: كِتَاب, מורה (אופציונלי)" class="lesson-input">
+            </div>
+            <button class="start-btn" onclick="startLesson()">התחל שיעור ←</button>
+        </div>
         <a href="#" class="action-card secondary" onclick="goTo('/generate-quiz', 'בונה את החידון...')">
             <span class="icon">🧠</span>
             <h2>חידון כולל</h2>
@@ -193,6 +204,17 @@
         'מכין את העיצוב...'
     ];
     var loadingInterval = null;
+
+    function startLesson() {
+        var topic = document.getElementById('lessonTopic').value.trim();
+        var words = document.getElementById('lessonWords').value.trim();
+        var url = '/generate-lesson';
+        var params = [];
+        if (topic) params.push('topic=' + encodeURIComponent(topic));
+        if (words) params.push('words=' + encodeURIComponent(words));
+        if (params.length) url += '?' + params.join('&');
+        goTo(url, 'מכין שיעור...');
+    }
 
     function goTo(url, text) {
         document.getElementById('loadingText').textContent = text;

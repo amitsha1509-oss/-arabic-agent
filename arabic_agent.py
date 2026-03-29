@@ -67,6 +67,7 @@ def init_database():
             article_translation TEXT
         )
     """)
+    c.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS filename TEXT")
     conn.commit()
     conn.close()
 
@@ -78,13 +79,13 @@ def get_used_words(user_id):
     conn.close()
     return words
 
-def save_to_database(data, today, user_id):
+def save_to_database(data, today, user_id, filename=None):
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        INSERT INTO lessons (user_id, date, topic, article, article_translation)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (user_id, today, data["topic_hebrew"], data["article"], data["article_translation"]))
+        INSERT INTO lessons (user_id, date, topic, article, article_translation, filename)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (user_id, today, data["topic_hebrew"], data["article"], data["article_translation"], filename))
     for word in data["words"]:
         c.execute("""
             INSERT INTO words (user_id, date, arabic, translation, transliteration, pronunciation, root, sentence, sentence_translation, topic)

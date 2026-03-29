@@ -68,16 +68,19 @@ def get_stats(user_id):
 def get_lessons(user_id):
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT id, date, topic FROM lessons WHERE user_id = %s ORDER BY date DESC", (user_id,))
+    c.execute("SELECT id, date, topic, filename FROM lessons WHERE user_id = %s ORDER BY date DESC", (user_id,))
     lessons = []
     for row in c.fetchall():
-        lesson_id, date, topic = row
-        filename = None
-        if os.path.exists(LESSONS_DIR):
-            for f in os.listdir(LESSONS_DIR):
-                if f.startswith(f"lesson_{user_id}_{date}"):
-                    filename = f
-                    break
+        lesson_id, date, topic, stored_filename = row
+        if stored_filename:
+            filename = stored_filename
+        else:
+            filename = None
+            if os.path.exists(LESSONS_DIR):
+                for f in os.listdir(LESSONS_DIR):
+                    if f.startswith(f"lesson_{user_id}_{date}"):
+                        filename = f
+                        break
         lessons.append({"id": lesson_id, "date": date, "topic": topic, "filename": filename or ""})
     conn.close()
     return lessons
@@ -137,7 +140,7 @@ def run_lesson_job(job_id, user_id, topic=None, custom_words=None):
         filename = f"lesson_{user_id}_{today}_{timestamp}.html"
         filepath = os.path.join(LESSONS_DIR, filename)
         create_lesson_html(data, today_hebrew, filepath)
-        save_to_database(data, today, user_id)
+        save_to_database(data, today, user_id, filename=filename)
         with jobs_lock:
             jobs[job_id] = {"status": "done", "filename": filename, "topic": data["topic_hebrew"], "error": None}
     except Exception as e:
@@ -337,14 +340,18 @@ def delete_lesson(lesson_id):
     user_id = session["user_id"]
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT date, topic FROM lessons WHERE id = %s AND user_id = %s", (lesson_id, user_id))
+    c.execute("SELECT date, topic, filename FROM lessons WHERE id = %s AND user_id = %s", (lesson_id, user_id))
     row = c.fetchone()
     if row:
-        date, topic = row
+        date, topic, stored_filename = row
         c.execute("DELETE FROM words WHERE date = %s AND topic = %s AND user_id = %s", (date, topic, user_id))
         c.execute("DELETE FROM lessons WHERE id = %s AND user_id = %s", (lesson_id, user_id))
         conn.commit()
-        if os.path.exists(LESSONS_DIR):
+        if stored_filename:
+            filepath = os.path.join(LESSONS_DIR, stored_filename)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        elif os.path.exists(LESSONS_DIR):
             for f in os.listdir(LESSONS_DIR):
                 if f.startswith(f"lesson_{user_id}_{date}"):
                     os.remove(os.path.join(LESSONS_DIR, f))

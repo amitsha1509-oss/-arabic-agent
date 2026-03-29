@@ -132,71 +132,75 @@ def validate_word(word, index):
         errors.append(f"word {index} 'sentence_translation' must be Hebrew only")
     return errors
 
+def _build_prompt(used_sample, topic, custom_words):
+    lines = []
+
+    # Topic at the very top so Claude sees it first
+    if topic:
+        lines.append("=== MANDATORY TOPIC ===")
+        lines.append("The article MUST be about: " + topic)
+        lines.append("Do NOT write about any other subject.")
+        lines.append("======================")
+        lines.append("")
+
+    lines.append("You are an expert MSA Arabic teacher. Create a daily Arabic lesson.")
+    lines.append("")
+    lines.append("Return ONLY a valid JSON object. No markdown, no code fences, no explanation.")
+    lines.append("")
+    lines.append("{")
+    lines.append('  "topic_hebrew": "' + (topic if topic else "\u05E0\u05D5\u05E9\u05D0 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA") + '",')
+    lines.append('  "article": "\u05DB\u05EA\u05D1\u05D4 \u05E9\u05DC 6 \u05DE\u05E9\u05E4\u05D8\u05D9\u05DD \u05D1\u05E2\u05E8\u05D1\u05D9\u05EA \u05E1\u05E4\u05E8\u05D5\u05EA\u05D9\u05EA \u05E2\u05DD \u05E0\u05D9\u05E7\u05D5\u05D3 \u05DE\u05DC\u05D0",')
+    lines.append('  "article_translation": "\u05EA\u05E8\u05D2\u05D5\u05DD \u05DE\u05DC\u05D0 \u05E9\u05DC \u05D4\u05DB\u05EA\u05D1\u05D4 \u05DC\u05E2\u05D1\u05E8\u05D9\u05EA, \u05DE\u05E9\u05E4\u05D8 \u05D0\u05D7\u05E8 \u05DE\u05E9\u05E4\u05D8",')
+    lines.append('  "words": [')
+    lines.append("    {")
+    lines.append('      "arabic": "\u05DE\u05D9\u05DC\u05D4 \u05D1\u05E2\u05E8\u05D1\u05D9\u05EA \u05E2\u05DD \u05E0\u05D9\u05E7\u05D5\u05D3",')
+    lines.append('      "translation": "\u05EA\u05E8\u05D2\u05D5\u05DD \u05E2\u05D1\u05E8\u05D9 \u05D1\u05DC\u05D1\u05D3",')
+    lines.append('      "transliteration_hebrew": "\u05EA\u05E2\u05EA\u05D9\u05E7 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u05D1\u05DC\u05D1\u05D3",')
+    lines.append('      "pronunciation_hebrew": "\u05D4\u05E1\u05D1\u05E8 \u05D4\u05D2\u05D9\u05D9\u05D4 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA",')
+    lines.append('      "root": "\u0641.\u0635.\u0644 \u2014 \u05DE\u05E9\u05DE\u05E2\u05D5\u05EA \u05D4\u05E9\u05D5\u05E8\u05E9",')
+    lines.append('      "sentence": "\u05DE\u05E9\u05E4\u05D8 \u05E7\u05E6\u05E8 \u05D1\u05E2\u05E8\u05D1\u05D9\u05EA \u05DE\u05D4\u05DB\u05EA\u05D1\u05D4",')
+    lines.append('      "sentence_translation": "\u05EA\u05E8\u05D2\u05D5\u05DD \u05D4\u05DE\u05E9\u05E4\u05D8 \u05DC\u05E2\u05D1\u05E8\u05D9\u05EA"')
+    lines.append("    }")
+    lines.append("  ]")
+    lines.append("}")
+    lines.append("")
+    lines.append("LANGUAGE RULES (strict \u2014 violating these causes the lesson to be rejected):")
+    lines.append("- topic_hebrew: HEBREW ONLY")
+    lines.append("- article: ARABIC ONLY with full harakat, Arabic punctuation only (. \u060c \u061f !)")
+    lines.append("- article_translation: HEBREW ONLY")
+    lines.append("- translation: HEBREW ONLY \u2014 no Arabic, no English")
+    lines.append("- transliteration_hebrew: HEBREW ONLY")
+    lines.append("- pronunciation_hebrew: HEBREW ONLY")
+    lines.append("- root: Arabic letters with dots (e.g. \u0641.\u0635.\u0644) then \u2014 then Hebrew meaning")
+    lines.append("- sentence: ARABIC ONLY with full harakat")
+    lines.append("- sentence_translation: HEBREW ONLY")
+    lines.append("")
+    lines.append("OTHER RULES:")
+    lines.append("- Exactly 10 words")
+    lines.append("- Full harakat on all Arabic")
+    lines.append("- Short sentences (max 8 words)")
+    lines.append("- Short article (6 sentences)")
+    if custom_words:
+        lines.append("- CUSTOM WORDS \u2014 these words MUST be in the 10 key words: " + custom_words)
+    lines.append("- Avoid already-used words: " + used_sample)
+    lines.append("")
+
+    # Topic repeated at the bottom
+    if topic:
+        lines.append("REMINDER: The article topic is '" + topic + "'. Write about nothing else.")
+    else:
+        lines.append("Choose an interesting and varied topic for the article.")
+
+    lines.append("")
+    lines.append("OUTPUT ONLY THE JSON OBJECT, NOTHING ELSE.")
+
+    return "\n".join(lines)
+
+
 def generate_arabic_content(used_words, topic=None, custom_words=None):
     print("Calling Claude...")
     used_sample = ", ".join(used_words[-50:]) if used_words else "none yet"
-
-    topic_block = ""
-    if topic:
-        topic_block = "\n\n*** MANDATORY TOPIC: " + topic + " — the article MUST be about this topic only. ***"
-
-    words_instruction = ""
-    if custom_words:
-        words_instruction = (
-            "\nCUSTOM WORDS REQUIREMENT:\n"
-            "The 10 key words MUST include these specific words: " + custom_words + "\n"
-            "Build the article so these words appear naturally in it.\n"
-            "If fewer than 10 words are provided, fill the remaining slots with relevant words from the article."
-        )
-
-    topic_rule = ("TOPIC: " + topic + " — MANDATORY, do not deviate from this topic") if topic else "TOPIC: Choose an interesting and varied topic"
-
-    prompt = (
-        "You are an expert MSA Arabic teacher. Create a daily Arabic lesson."
-        + topic_block
-        + "\n\nIMPORTANT: Return ONLY a valid JSON object. No markdown, no code fences, no explanation. Just the raw JSON.\n"
-        "\n"
-        "{\n"
-        '  "topic_hebrew": "נושא בעברית בלבד",\n'
-        '  "article": "כתבה של 6 משפטים בערבית ספרותית עם ניקוד מלא",\n'
-        '  "article_translation": "תרגום מלא של הכתבה לעברית, משפט אחר משפט",\n'
-        '  "words": [\n'
-        "    {\n"
-        '      "arabic": "מילה בערבית עם ניקוד",\n'
-        '      "translation": "תרגום עברי בלבד",\n'
-        "      \"transliteration_hebrew\": \"\u05EA\u05E2\u05EA\u05D9\u05E7 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u05D1\u05DC\u05D1\u05D3 \u2014 \u05DC\u05D3\u05D5\u05D2\u05DE\u05D0: \u05E4\u05B7\u05BC\u05E6\u05B7\u05E2\u05B7\u05E1\u05BE\u05DC\",\n"
-        "      \"pronunciation_hebrew\": \"\u05D4\u05E1\u05D1\u05E8 \u05D4\u05D2\u05D9\u05D9\u05D4 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u2014 \u05DC\u05D3\u05D5\u05D2\u05DE\u05D0: \u05E4' \u05E2\u05DD \u05D3\u05D2\u05E9, \u05DC' \u05D1\u05E1\u05D5\u05E3\",\n"
-        '      "root": "\u0641.\u0635.\u0644 \u2014 \u05DE\u05E9\u05DE\u05E2\u05D5\u05EA \u05D4\u05E9\u05D5\u05E8\u05E9 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA",\n'
-        '      "sentence": "\u05DE\u05E9\u05E4\u05D8 \u05E7\u05E6\u05E8 \u05D1\u05E2\u05E8\u05D1\u05D9\u05EA \u05DE\u05D4\u05DB\u05EA\u05D1\u05D4 \u05E2\u05DD \u05E0\u05D9\u05E7\u05D5\u05D3 \u05DE\u05DC\u05D0",\n'
-        '      "sentence_translation": "\u05EA\u05E8\u05D2\u05D5\u05DD \u05D4\u05DE\u05E9\u05E4\u05D8 \u05DC\u05E2\u05D1\u05E8\u05D9\u05EA \u05D1\u05DC\u05D1\u05D3"\n'
-        "    }\n"
-        "  ]\n"
-        "}\n"
-        "\n"
-        "STRICT LANGUAGE RULES \u2014 every field must contain ONLY its designated language. Mixed language is forbidden:\n"
-        "- topic_hebrew: HEBREW ONLY \u2014 zero Arabic or English characters\n"
-        "- article: ARABIC ONLY with full harakat \u2014 use ONLY Arabic punctuation: . \u060c \u061f ! \u2014 NO Western commas or question marks\n"
-        "- article_translation: HEBREW ONLY with standard Hebrew/Western punctuation (. , ? !) \u2014 this is correct\n"
-        "- translation: HEBREW ONLY \u2014 no Arabic, no English\n"
-        "- transliteration_hebrew: HEBREW LETTERS ONLY \u2014 no English, no Arabic\n"
-        "- pronunciation_hebrew: HEBREW ONLY explanation \u2014 no English, no Arabic\n"
-        "- root: Arabic root letters with dots between them (e.g. \u0641.\u0635.\u0644) followed by \u2014 and Hebrew meaning \u2014 no English\n"
-        "- sentence: ARABIC ONLY taken from the article with full harakat \u2014 no Hebrew, no English\n"
-        "- sentence_translation: HEBREW ONLY \u2014 no Arabic, no English\n"
-        "\n"
-        "Before returning JSON, verify each field contains only its designated language.\n"
-        "\n"
-        "ADDITIONAL RULES:\n"
-        "- Exactly 10 words\n"
-        "- All Arabic must have full harakat\n"
-        "- No final case endings on individual words\n"
-        "- Keep sentences SHORT (max 8 words each)\n"
-        "- Keep the article SHORT (6 sentences only)\n"
-        "- " + topic_rule + "\n"
-        + words_instruction + "\n"
-        "- AVOID these words already used: " + used_sample + "\n"
-        "- OUTPUT ONLY THE JSON OBJECT, NOTHING ELSE"
-    )
+    prompt = _build_prompt(used_sample, topic, custom_words)
 
     last_errors = None
     for attempt in range(3):
@@ -212,7 +216,7 @@ def generate_arabic_content(used_words, topic=None, custom_words=None):
         raw = re.sub(r'\n?```$', '', raw)
         raw = raw.strip()
         data = json.loads(raw)
-        data['topic_hebrew'] = re.sub(r'[\u0600-\u06FF]+', '', data['topic_hebrew']).strip(' -\u2013\u2014')
+        data['topic_hebrew'] = re.sub(r'[\u0600-\u06FF]+', '', data['topic_hebrew']).strip(' \u2013\u2014-')
         all_errors = []
         for i, word in enumerate(data.get('words', []), 1):
             all_errors.extend(validate_word(word, i))

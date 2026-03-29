@@ -198,7 +198,7 @@ def _build_prompt(used_sample, topic, custom_words):
 
 
 def generate_arabic_content(used_words, topic=None, custom_words=None):
-    print("Calling Claude...")
+    print(f"Calling Claude... topic={repr(topic)} custom_words={repr(custom_words)}")
     used_sample = ", ".join(used_words[-50:]) if used_words else "none yet"
     prompt = _build_prompt(used_sample, topic, custom_words)
 

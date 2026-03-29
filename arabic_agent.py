@@ -132,70 +132,95 @@ def validate_word(word, index):
         errors.append(f"word {index} 'sentence_translation' must be Hebrew only")
     return errors
 
-def generate_arabic_content(used_words):
+def generate_arabic_content(used_words, topic=None, custom_words=None):
     print("Calling Claude...")
     used_sample = ", ".join(used_words[-50:]) if used_words else "none yet"
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=8000,
-        messages=[{"role": "user", "content": f"""You are an expert MSA Arabic teacher. Create a daily Arabic lesson.
 
-IMPORTANT: Return ONLY a valid JSON object. No markdown, no code fences, no explanation. Just the raw JSON.
+    topic_block = ""
+    if topic:
+        topic_block = "\n\n*** MANDATORY TOPIC: " + topic + " — the article MUST be about this topic only. ***"
 
-{{
-  "topic_hebrew": "נושא בעברית בלבד",
-  "article": "כתבה של 6 משפטים בערבית ספרותית עם ניקוד מלא",
-  "article_translation": "תרגום מלא של הכתבה לעברית, משפט אחר משפט",
-  "words": [
-    {{
-      "arabic": "מילה בערבית עם ניקוד",
-      "translation": "תרגום עברי בלבד",
-      "transliteration_hebrew": "תעתיק בעברית בלבד — לדוגמה: פַּצַ'ל",
-      "pronunciation_hebrew": "הסבר הגייה בעברית — לדוגמה: פ' עם דגש, ל' בסוף",
-      "root": "ف.ص.ל — משמעות השורש בעברית",
-      "sentence": "משפט קצר בערבית מהכתבה עם ניקוד מלא",
-      "sentence_translation": "תרגום המשפט לעברית בלבד"
-    }}
-  ]
-}}
+    words_instruction = ""
+    if custom_words:
+        words_instruction = (
+            "\nCUSTOM WORDS REQUIREMENT:\n"
+            "The 10 key words MUST include these specific words: " + custom_words + "\n"
+            "Build the article so these words appear naturally in it.\n"
+            "If fewer than 10 words are provided, fill the remaining slots with relevant words from the article."
+        )
 
-STRICT LANGUAGE RULES — every field must contain ONLY its designated language. Mixed language is forbidden:
-- topic_hebrew: HEBREW ONLY — zero Arabic or English characters
-- article: ARABIC ONLY with full harakat — use ONLY Arabic punctuation: . ، ؟ ! — NO Western commas or question marks
-- article_translation: HEBREW ONLY with standard Hebrew/Western punctuation (. , ? !) — this is correct
-- translation: HEBREW ONLY — no Arabic, no English
-- transliteration_hebrew: HEBREW LETTERS ONLY — no English, no Arabic
-- pronunciation_hebrew: HEBREW ONLY explanation — no English, no Arabic
-- root: Arabic root letters with dots between them (e.g. ف.ص.ل) followed by — and Hebrew meaning — no English
-- sentence: ARABIC ONLY taken from the article with full harakat — no Hebrew, no English
-- sentence_translation: HEBREW ONLY — no Arabic, no English
+    topic_rule = ("TOPIC: " + topic + " — MANDATORY, do not deviate from this topic") if topic else "TOPIC: Choose an interesting and varied topic"
 
-Before returning JSON, verify each field contains only its designated language.
-
-ADDITIONAL RULES:
-- Exactly 10 words
-- All Arabic must have full harakat
-- No final case endings on individual words
-- Keep sentences SHORT (max 8 words each)
-- Keep the article SHORT (6 sentences only)
-- AVOID these words already used: {used_sample}
-- OUTPUT ONLY THE JSON OBJECT, NOTHING ELSE"""}]
+    prompt = (
+        "You are an expert MSA Arabic teacher. Create a daily Arabic lesson."
+        + topic_block
+        + "\n\nIMPORTANT: Return ONLY a valid JSON object. No markdown, no code fences, no explanation. Just the raw JSON.\n"
+        "\n"
+        "{\n"
+        '  "topic_hebrew": "נושא בעברית בלבד",\n'
+        '  "article": "כתבה של 6 משפטים בערבית ספרותית עם ניקוד מלא",\n'
+        '  "article_translation": "תרגום מלא של הכתבה לעברית, משפט אחר משפט",\n'
+        '  "words": [\n'
+        "    {\n"
+        '      "arabic": "מילה בערבית עם ניקוד",\n'
+        '      "translation": "תרגום עברי בלבד",\n'
+        "      \"transliteration_hebrew\": \"\u05EA\u05E2\u05EA\u05D9\u05E7 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u05D1\u05DC\u05D1\u05D3 \u2014 \u05DC\u05D3\u05D5\u05D2\u05DE\u05D0: \u05E4\u05B7\u05BC\u05E6\u05B7\u05E2\u05B7\u05E1\u05BE\u05DC\",\n"
+        "      \"pronunciation_hebrew\": \"\u05D4\u05E1\u05D1\u05E8 \u05D4\u05D2\u05D9\u05D9\u05D4 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA \u2014 \u05DC\u05D3\u05D5\u05D2\u05DE\u05D0: \u05E4' \u05E2\u05DD \u05D3\u05D2\u05E9, \u05DC' \u05D1\u05E1\u05D5\u05E3\",\n"
+        '      "root": "\u0641.\u0635.\u0644 \u2014 \u05DE\u05E9\u05DE\u05E2\u05D5\u05EA \u05D4\u05E9\u05D5\u05E8\u05E9 \u05D1\u05E2\u05D1\u05E8\u05D9\u05EA",\n'
+        '      "sentence": "\u05DE\u05E9\u05E4\u05D8 \u05E7\u05E6\u05E8 \u05D1\u05E2\u05E8\u05D1\u05D9\u05EA \u05DE\u05D4\u05DB\u05EA\u05D1\u05D4 \u05E2\u05DD \u05E0\u05D9\u05E7\u05D5\u05D3 \u05DE\u05DC\u05D0",\n'
+        '      "sentence_translation": "\u05EA\u05E8\u05D2\u05D5\u05DD \u05D4\u05DE\u05E9\u05E4\u05D8 \u05DC\u05E2\u05D1\u05E8\u05D9\u05EA \u05D1\u05DC\u05D1\u05D3"\n'
+        "    }\n"
+        "  ]\n"
+        "}\n"
+        "\n"
+        "STRICT LANGUAGE RULES \u2014 every field must contain ONLY its designated language. Mixed language is forbidden:\n"
+        "- topic_hebrew: HEBREW ONLY \u2014 zero Arabic or English characters\n"
+        "- article: ARABIC ONLY with full harakat \u2014 use ONLY Arabic punctuation: . \u060c \u061f ! \u2014 NO Western commas or question marks\n"
+        "- article_translation: HEBREW ONLY with standard Hebrew/Western punctuation (. , ? !) \u2014 this is correct\n"
+        "- translation: HEBREW ONLY \u2014 no Arabic, no English\n"
+        "- transliteration_hebrew: HEBREW LETTERS ONLY \u2014 no English, no Arabic\n"
+        "- pronunciation_hebrew: HEBREW ONLY explanation \u2014 no English, no Arabic\n"
+        "- root: Arabic root letters with dots between them (e.g. \u0641.\u0635.\u0644) followed by \u2014 and Hebrew meaning \u2014 no English\n"
+        "- sentence: ARABIC ONLY taken from the article with full harakat \u2014 no Hebrew, no English\n"
+        "- sentence_translation: HEBREW ONLY \u2014 no Arabic, no English\n"
+        "\n"
+        "Before returning JSON, verify each field contains only its designated language.\n"
+        "\n"
+        "ADDITIONAL RULES:\n"
+        "- Exactly 10 words\n"
+        "- All Arabic must have full harakat\n"
+        "- No final case endings on individual words\n"
+        "- Keep sentences SHORT (max 8 words each)\n"
+        "- Keep the article SHORT (6 sentences only)\n"
+        "- " + topic_rule + "\n"
+        + words_instruction + "\n"
+        "- AVOID these words already used: " + used_sample + "\n"
+        "- OUTPUT ONLY THE JSON OBJECT, NOTHING ELSE"
     )
-    raw = response.content[0].text.strip()
-    raw = re.sub(r'^```[a-z]*\n?', '', raw)
-    raw = re.sub(r'\n?```$', '', raw)
-    raw = raw.strip()
-    data = json.loads(raw)
-    data['topic_hebrew'] = re.sub(r'[\u0600-\u06FF]+', '', data['topic_hebrew']).strip(' -–—')
 
-    # Server-side validation
-    all_errors = []
-    for i, word in enumerate(data.get('words', []), 1):
-        all_errors.extend(validate_word(word, i))
-    if all_errors:
-        raise ValueError("Language validation failed:\n" + "\n".join(all_errors))
+    last_errors = None
+    for attempt in range(3):
+        if attempt > 0:
+            print(f"Retrying Claude (attempt {attempt + 1}) due to: {last_errors[:120]}")
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=8000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = response.content[0].text.strip()
+        raw = re.sub(r'^```[a-z]*\n?', '', raw)
+        raw = re.sub(r'\n?```$', '', raw)
+        raw = raw.strip()
+        data = json.loads(raw)
+        data['topic_hebrew'] = re.sub(r'[\u0600-\u06FF]+', '', data['topic_hebrew']).strip(' -\u2013\u2014')
+        all_errors = []
+        for i, word in enumerate(data.get('words', []), 1):
+            all_errors.extend(validate_word(word, i))
+        if not all_errors:
+            return data
+        last_errors = "; ".join(all_errors)
 
-    return data
+    raise ValueError("Language validation failed after 3 attempts: " + last_errors)
 
 def create_lesson_html(data, today_hebrew, filename):
     words_html = ""
